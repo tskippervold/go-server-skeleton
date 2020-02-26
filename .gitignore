@@ -1,0 +1,6 @@
+
+### PROJECT SPECIFIC
+__debug*
+*.db
+*.pem
+vendor/

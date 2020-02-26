@@ -10,21 +10,26 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type contextKey string
+
 const (
-	requestContextTraceId = "_rTraceId"
-	kLogTraceId           = "traceId"
+	requestLoggerFields = contextKey("_rRequestLoggerFields")
+	logTraceID          = contextKey("traceId")
+	logRequestMethod    = contextKey("method")
+	logRequestPath      = contextKey("path")
+	logRequestUserAgent = contextKey("userAgent")
 )
 
 type Log struct {
 	logger *logrus.Logger
-	trace  *string
+	fields *logrus.Fields
 }
 
 // Creates a new Log instance.
 func NewLogger() *Log {
 	logger := Log{
 		logger: logrus.New(),
-		trace:  nil,
+		fields: nil,
 	}
 
 	logger.logger.Formatter = &logrus.JSONFormatter{
@@ -36,10 +41,10 @@ func NewLogger() *Log {
 
 // Creates a Log instance containing a traceId from `http.Request`.
 func (l *Log) ForRequest(r *http.Request) *Log {
-	tid := r.Context().Value(requestContextTraceId).(string)
+	fields := r.Context().Value(requestLoggerFields).(logrus.Fields)
 
 	c := NewLogger()
-	c.trace = &tid
+	c.fields = &fields
 
 	return c
 }
@@ -60,20 +65,29 @@ func (l *Log) Error(a ...interface{}) {
 func (l *Log) HTTPRequestMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tid := uuid.NewV4().String()
-		ctx := context.WithValue(r.Context(), requestContextTraceId, tid)
-		requestWithTrace := r.WithContext(ctx)
+		fields := logrus.Fields{
+			string(logTraceID):          tid,
+			string(logRequestMethod):    r.Method,
+			string(logRequestPath):      r.URL.Path,
+			string(logRequestUserAgent): r.UserAgent(),
+		}
 
-		l.logger.WithField(kLogTraceId, tid).Info(r.Method, r.URL.Path, r.RemoteAddr, r.UserAgent())
+		ctx := context.WithValue(r.Context(), requestLoggerFields, fields)
+		r = r.WithContext(ctx)
 
-		next.ServeHTTP(w, requestWithTrace)
+		// Logging the request before handling it
+		logger := l.logger.WithFields(fields)
+		logger.Info()
+
+		next.ServeHTTP(w, r)
 	})
 }
 
 func (l *Log) log(level logrus.Level, a ...interface{}) {
 	msg := fmtLogMsg(a)
 
-	if l.trace != nil {
-		l.logger.WithField(kLogTraceId, l.trace).Log(level, msg)
+	if l.fields != nil {
+		l.logger.WithFields(*l.fields).Log(level, msg)
 	} else {
 		l.logger.Log(level, msg)
 	}

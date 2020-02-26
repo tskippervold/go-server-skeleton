@@ -32,7 +32,7 @@ func NewLogger() *Log {
 		fields: nil,
 	}
 
-	logger.logger.Formatter = &logrus.JSONFormatter{
+	logger.logger.Formatter = &logrus.TextFormatter{
 		DisableTimestamp: false,
 	}
 

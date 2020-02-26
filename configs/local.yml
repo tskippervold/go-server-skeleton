@@ -1,0 +1,10 @@
+server:
+    port: 8080
+    connectionTimeout: 15 # The duration for which the server gracefully wait for existing connections to finish in seconds.
+
+database:
+    host: "localhost"
+    port: 5432
+    name: ""
+    user: ""
+    pass: ""

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"runtime"
 	"strings"
 
 	uuid "github.com/satori/go.uuid"
@@ -14,6 +15,7 @@ type contextKey string
 
 const (
 	requestLoggerFields = contextKey("_rRequestLoggerFields")
+	logFilename         = contextKey("filename")
 	logTraceID          = contextKey("traceId")
 	logRequestMethod    = contextKey("method")
 	logRequestPath      = contextKey("path")
@@ -27,9 +29,13 @@ type Log struct {
 
 // Creates a new Log instance.
 func NewLogger() *Log {
+	_, file, no, _ := runtime.Caller(1)
+
 	logger := Log{
 		logger: logrus.New(),
-		fields: nil,
+		fields: &logrus.Fields{
+			string(logFilename): fmt.Sprintf("%s#%d", file, no),
+		},
 	}
 
 	logger.logger.Formatter = &logrus.TextFormatter{
@@ -41,10 +47,11 @@ func NewLogger() *Log {
 
 // Creates a Log instance containing a traceId from `http.Request`.
 func (l *Log) ForRequest(r *http.Request) *Log {
-	fields := r.Context().Value(requestLoggerFields).(logrus.Fields)
-
 	c := NewLogger()
-	c.fields = &fields
+
+	if f, ok := r.Context().Value(requestLoggerFields).(logrus.Fields); ok {
+		c.fields = &f
+	}
 
 	return c
 }

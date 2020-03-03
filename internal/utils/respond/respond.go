@@ -1,4 +1,4 @@
-package response
+package respond
 
 import (
 	"encoding/json"
@@ -7,16 +7,28 @@ import (
 
 // Externals
 
+func InternalError(w http.ResponseWriter) {
+	Error(w, "server_error", http.StatusInternalServerError)
+}
+
+func BadRequest(w http.ResponseWriter) {
+	Error(w, "Bad request", http.StatusBadRequest)
+}
+
+func Unauthorized(w http.ResponseWriter) {
+	Error(w, "unauthorized", http.StatusUnauthorized)
+}
+
+func Forbidden(w http.ResponseWriter) {
+	Error(w, "forbidden", http.StatusForbidden)
+}
+
 func Error(w http.ResponseWriter, error string, code int) {
 	writeHeader(w, code)
 
 	if err := writeJson(w, map[string]string{errorFieldName: error}); err != nil {
 		panic(err)
 	}
-}
-
-func BadRequest(w http.ResponseWriter) {
-	Error(w, "Bad request", http.StatusBadRequest)
 }
 
 func Ok(w http.ResponseWriter, v interface{}) {
@@ -61,14 +73,20 @@ func encodeJson(w http.ResponseWriter, v interface{}) ([]byte, error) {
 
 // Encode the object in JSON and call Write.
 func writeJson(w http.ResponseWriter, v interface{}) error {
+	if v == nil {
+		return nil
+	}
+
 	b, err := encodeJson(w, v)
 	if err != nil {
 		return err
 	}
+
 	_, err = w.Write(b)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 

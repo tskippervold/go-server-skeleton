@@ -5,8 +5,9 @@ import (
 
 	"github.com/gorilla/mux"
 	env "github.com/tskippervold/golang-base-server/internal/app"
+	"github.com/tskippervold/golang-base-server/internal/utils/log"
 	"github.com/tskippervold/golang-base-server/internal/utils/request"
-	"github.com/tskippervold/golang-base-server/internal/utils/response"
+	"github.com/tskippervold/golang-base-server/internal/utils/respond"
 )
 
 func AccountsHandlers(r *mux.Router, env *env.Env) {
@@ -21,9 +22,9 @@ func getAccounts(env *env.Env) http.Handler {
 			Using this logger makes it possible to trace this specific request.
 			Notice the `traceId` field in the log for this request, tying it all together.
 		*/
-		logger := env.Log.ForRequest(r)
+		logger := log.ForRequest(r)
 		logger.Info("Logging something..")
-		response.Ok(w, "🙌")
+		respond.Ok(w, "🙌")
 	})
 }
 
@@ -41,16 +42,16 @@ func createAccount(env *env.Env) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var body Request
 		if err := request.Decode(r, &body); err != nil {
-			response.Error(w, err.Error(), http.StatusInternalServerError)
+			respond.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		/*
 			You can either return a `struct` directly to JSON using:
-			`response.OK(w, yourStructHere)`
+			`respond.OK(w, yourStructHere)`
 			Or you can compose your response as shown:
 		*/
-		response.Ok(w, map[string]interface{}{
+		respond.Ok(w, map[string]interface{}{
 			"requestBody": body,
 		})
 	})

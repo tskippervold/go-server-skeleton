@@ -1,4 +1,4 @@
-package utils
+package log
 
 import (
 	"context"
@@ -46,7 +46,7 @@ func NewLogger() *Log {
 }
 
 // Creates a Log instance containing a traceId from `http.Request`.
-func (l *Log) ForRequest(r *http.Request) *Log {
+func ForRequest(r *http.Request) *Log {
 	c := NewLogger()
 
 	if f, ok := r.Context().Value(requestLoggerFields).(logrus.Fields); ok {
@@ -79,14 +79,12 @@ func (l *Log) HTTPRequestMiddleware(next http.Handler) http.Handler {
 			string(logRequestUserAgent): r.UserAgent(),
 		}
 
-		ctx := context.WithValue(r.Context(), requestLoggerFields, fields)
-		r = r.WithContext(ctx)
-
 		// Logging the request before handling it
 		logger := l.logger.WithFields(fields)
 		logger.Info()
 
-		next.ServeHTTP(w, r)
+		ctx := context.WithValue(r.Context(), requestLoggerFields, fields)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 

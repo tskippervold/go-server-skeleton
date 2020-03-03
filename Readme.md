@@ -12,10 +12,20 @@ You can duplicate the existing `local.yml`.
 Run the server with `-config={filename}` argument.
 During development, you can do `go run cmd/main.go -config=local.yml`.
 
+## Database migrations
+`migrate create -ext sql -dir internal/db/migrations -seq create_<tablename>_table`
+
+_https://github.com/golang-migrate/migrate/blob/master/database/postgres/TUTORIAL.md_
+
+## Key generation
+Generate RSA keys for signing and verifying JWT tokens:
+ * Generate private key: `openssl genrsa -out private.pem 2048`
+ * Extract public key: `openssl rsa -in private.pem -pubout > public.pem`
+
+_https://developers.yubico.com/PIV/Guides/Generating_keys_using_OpenSSL.html_
+
 ### TODO's
  * Handle database connection loss gracefully.
- * Support multiple databases.
  * Have package for JWT token authorization and authentication.
+   - Support access and refresh tokens. Access token should be stateless, but refresh tokens should be stored in some database as "valid token". Whenever a refresh token operation is submitted its checked against this storage. In case of DoS attack, all refresh token operations will fail.
  * Dockerize the project with simple deployment stages.
- * (Nice to have) Add request timing middleware logging duration of request/responses.
- 

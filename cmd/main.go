@@ -3,82 +3,96 @@ package main
 import (
 	"context"
 	"flag"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
 
-	"github.com/gorilla/mux"
-	env "github.com/tskippervold/golang-base-server/internal/app"
+	"github.com/tskippervold/golang-base-server/internal/app/auth"
 	"github.com/tskippervold/golang-base-server/internal/app/handlers"
-	"github.com/tskippervold/golang-base-server/internal/utils"
+	"github.com/tskippervold/golang-base-server/internal/db"
+	"github.com/tskippervold/golang-base-server/internal/utils/log"
+
+	env "github.com/tskippervold/golang-base-server/internal/app"
+
+	"github.com/gorilla/mux"
 )
 
-var logger = utils.NewLogger()
-
 func main() {
+	logger := log.NewLogger()
+
 	// Parsing the specified run argument `-config=`
 	flagConfig := flag.String("config", "local.yml", "Config yaml file")
 	flag.Parse()
 
 	// Load a `Config` struct containing the yaml values.
 	logger.Info("Loading config:", *flagConfig)
-	config, err := env.LoadConfig("./configs/" + *flagConfig)
+	config, err := env.LoadConfig(".././configs/" + *flagConfig)
 	if err != nil {
 		panic(err)
 	}
 
-	/*
-		Uncomment bellow when you are ready to use a Postgres database.
-	*/
-	/*logger.Info("Connecting to database:", config.Database.Host, config.Database.Name)
-	dbConnection, err := env.ConnectDatabase(config.Database.Host, config.Database.Name, config.Database.Name, config.Database.User, config.Database.Pass)
-	if err != nil {
-		panic(err)
-	}
-
-	e := &env.Env{
-		DB:  dbConnection,
-		Log: logger,
-	}
-
-	logger.Info("Migrating database")
-	if err := e.MigrateDatabase(); err != nil {
+	/*if err := db.ConnectToTest(); err != nil {
 		panic(err)
 	}*/
 
-	e := &env.Env{
-		Log: logger,
+	logger.Info("Connecting to database:", config.Database.Host, config.Database.Name)
+	if err := db.Connect(
+		config.Database.Host,
+		config.Database.Port,
+		config.Database.Name,
+		config.Database.User,
+		config.Database.Pass,
+	); err != nil {
+		panic(err)
+	}
+
+	logger.Info("Migrating database")
+	if err := db.Migrate(); err != nil {
+		panic(err)
 	}
 
 	logger.Info("Starting server on port:", config.Server.Port)
-	startServer(config.Server.Port, config.Server.ConnectionTimeout, func() http.Handler {
-		r := mux.NewRouter()
-		r.Use(e.Log.HTTPRequestMiddleware)
-		handlers.Setup(r.PathPrefix("/api").Subrouter(), e)
-		return r
-	}, onServerShutdown)
+	startServer(config.Server.Port, config.Server.ConnectionTimeout, onRouterSetup, onServerShutdown)
+}
+
+func onRouterSetup() http.Handler {
+	env := env.Env{
+		Log: log.NewLogger(),
+		DB:  db.GetConnection(),
+	}
+
+	r := mux.NewRouter()
+	r.Use(env.Log.HTTPRequestMiddleware)
+
+	rAuth := r.PathPrefix("/auth").Subrouter()
+	auth.Setup(rAuth, &env)
+
+	rAPI := r.PathPrefix("/api").Subrouter()
+	rAPI.Use(auth.JWTMiddleware)
+	handlers.Setup(rAPI, &env)
+
+	return r
 }
 
 /*
 Supporting gracefully server shutdown alongside Golang's native *http and Gorilla Mux.
 Implementation taken from https://github.com/gorilla/mux/blob/master/README.md#graceful-shutdown.
 */
-func startServer(port string, connectionTimeout time.Duration, handler func() http.Handler, onShutdown func()) {
+func startServer(port string, connectionTimeout time.Duration, onRouterSetup func() http.Handler, onShutdown func()) {
 	srv := &http.Server{
 		Addr: "0.0.0.0:" + port,
 		// Good practice to set timeouts to avoid Slowloris attacks.
 		WriteTimeout: time.Second * 15,
 		ReadTimeout:  time.Second * 15,
 		IdleTimeout:  time.Second * 60,
-		Handler:      handler(),
+		Handler:      onRouterSetup(),
 	}
 
 	// Run our server in a goroutine so that it doesn't block.
 	go func() {
 		if err := srv.ListenAndServe(); err != nil {
-			log.Println(err)
+			panic(err)
 		}
 	}()
 
@@ -106,6 +120,7 @@ func startServer(port string, connectionTimeout time.Duration, handler func() ht
 }
 
 func onServerShutdown() {
+	logger := log.NewLogger()
 	logger.Info("Server did shutdown")
 	os.Exit(0)
 }

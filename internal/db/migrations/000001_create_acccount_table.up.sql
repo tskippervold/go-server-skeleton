@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS account
+(
+	iid SERIAL
+		CONSTRAINT account_pk
+			PRIMARY KEY,
+	created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+	email VARCHAR(250)
+);

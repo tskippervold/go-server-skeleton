@@ -3,21 +3,22 @@ package auth
 import (
 	"context"
 	"crypto/rsa"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/tskippervold/golang-base-server/internal/utils/respond"
+
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/dgrijalva/jwt-go"
 
-	"github.com/tskippervold/golang-base-server/internal/utils/log"
-	"github.com/tskippervold/golang-base-server/internal/utils/respond"
-
 	"github.com/gorilla/mux"
 
 	env "github.com/tskippervold/golang-base-server/internal/app"
+	"github.com/tskippervold/golang-base-server/internal/utils/log"
 )
 
 type contextKey string
@@ -54,14 +55,19 @@ func JWTMiddleware(next http.Handler) http.Handler {
 		bearerToken = strings.TrimPrefix(strings.TrimPrefix(bearerToken, "bearer "), "Bearer ")
 
 		if bearerToken == "" {
-			respond.Unauthorized(w)
+			err := errors.New("Bearer token is malformed or missing")
+			log.Info(err)
+
+			res := respond.Error(err, http.StatusUnauthorized, "Authorization required", "missing_auth")
+			res.Write(w)
 			return
 		}
 
 		token, err := parseAndVerifyJWT(bearerToken)
 		if err != nil {
-			log.Info(err.Error())
-			respond.Forbidden(w)
+			log.Info(err)
+			res := respond.Error(err, http.StatusUnauthorized, "Invalid credentials", "invalid_credentials")
+			res.Write(w)
 			return
 		}
 

@@ -3,94 +3,97 @@ package respond
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/tskippervold/golang-base-server/internal/utils/log"
 )
 
-// Externals
-
-func InternalError(w http.ResponseWriter) {
-	Error(w, "server_error", http.StatusInternalServerError)
+type Response struct {
+	Status  int
+	Failure *Failure
+	Success interface{}
 }
 
-func BadRequest(w http.ResponseWriter) {
-	Error(w, "Bad request", http.StatusBadRequest)
+type Failure struct {
+	Cause   error  `json:"-"`
+	Message string `json:"message"`
+	Code    string `json:"code"`
 }
 
-func Unauthorized(w http.ResponseWriter) {
-	Error(w, "unauthorized", http.StatusUnauthorized)
-}
-
-func Forbidden(w http.ResponseWriter) {
-	Error(w, "forbidden", http.StatusForbidden)
-}
-
-func Error(w http.ResponseWriter, error string, code int) {
-	writeHeader(w, code)
-
-	if err := writeJson(w, map[string]string{errorFieldName: error}); err != nil {
-		panic(err)
+func (r *Response) Write(w http.ResponseWriter) {
+	body, err := json.Marshal(r)
+	if err != nil {
+		log.NewLogger().Error(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
-}
 
-func Ok(w http.ResponseWriter, v interface{}) {
-	writeHeader(w, http.StatusOK)
-
-	if err := writeJson(w, v); err != nil {
-		panic(err)
-	}
-}
-
-func Created(w http.ResponseWriter, v interface{}) {
-	writeHeader(w, http.StatusCreated)
-
-	if err := writeJson(w, v); err != nil {
-		panic(err)
-	}
-}
-
-// Internals
-
-var (
-	errorFieldName = "error"
-)
-
-func writeHeader(w http.ResponseWriter, code int) {
 	// Per spec, UTF-8 is the default, and the charset parameter should not
 	// be necessary. But some clients (eg: Chrome) think otherwise.
 	// Since json.Marshal produces UTF-8, setting the charset parameter is a
 	// safe option.
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-
-	w.WriteHeader(code)
+	w.WriteHeader(r.Status)
+	w.Write(body)
 }
 
-func encodeJson(w http.ResponseWriter, v interface{}) ([]byte, error) {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return nil, err
+func (r *Response) MarshalJSON() ([]byte, error) {
+	if f := r.Failure; f != nil {
+		// Maps the failure to a json object:
+		// { "error": { <Failure> + debug string } }
+		return json.Marshal(&struct {
+			Error interface{} `json:"error"`
+		}{
+			Error: struct {
+				*Failure
+				Debug string `json:"debug"`
+			}{
+				Failure: f,
+				Debug:   f.Cause.Error(),
+			},
+		})
 	}
-	return b, nil
+
+	if s := r.Success; s != nil {
+		return json.Marshal(s)
+	}
+
+	return json.Marshal(struct{}{})
 }
 
-// Encode the object in JSON and call Write.
-func writeJson(w http.ResponseWriter, v interface{}) error {
-	if v == nil {
-		return nil
+func Success(status int, i interface{}) *Response {
+	return &Response{
+		Status:  status,
+		Failure: nil,
+		Success: i,
 	}
-
-	b, err := encodeJson(w, v)
-	if err != nil {
-		return err
-	}
-
-	_, err = w.Write(b)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
-// Provided in order to implement the http.ResponseWriter interface.
-func write(w http.ResponseWriter, b []byte) (int, error) {
-	return w.Write(b)
+func Error(err error, status int, detail string, code string) *Response {
+	f := Failure{
+		Cause:   err,
+		Message: detail,
+		Code:    code,
+	}
+
+	return &Response{
+		Status:  status,
+		Failure: &f,
+		Success: nil,
+	}
+}
+
+func GenericServerError(err error) *Response {
+	status := http.StatusInternalServerError
+
+	f := Failure{
+		Cause:   err,
+		Message: http.StatusText(status),
+		Code:    "error",
+	}
+
+	return &Response{
+		Status:  status,
+		Failure: &f,
+		Success: nil,
+	}
 }

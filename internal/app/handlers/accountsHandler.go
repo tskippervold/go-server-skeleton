@@ -3,11 +3,13 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/gorilla/mux"
-	env "github.com/tskippervold/golang-base-server/internal/app"
-	"github.com/tskippervold/golang-base-server/internal/utils/log"
 	"github.com/tskippervold/golang-base-server/internal/utils/request"
 	"github.com/tskippervold/golang-base-server/internal/utils/respond"
+
+	"github.com/gorilla/mux"
+	env "github.com/tskippervold/golang-base-server/internal/app"
+	"github.com/tskippervold/golang-base-server/internal/utils/handler"
+	"github.com/tskippervold/golang-base-server/internal/utils/log"
 )
 
 func AccountsHandlers(r *mux.Router, env *env.Env) {
@@ -15,8 +17,8 @@ func AccountsHandlers(r *mux.Router, env *env.Env) {
 	r.Handle("/", createAccount(env)).Methods("POST")
 }
 
-func getAccounts(env *env.Env) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func getAccounts(env *env.Env) handler.Handler {
+	return handler.HandlerFunc(func(w http.ResponseWriter, r *http.Request) *respond.Response {
 		/*
 			Get the logger for this request.
 			Using this logger makes it possible to trace this specific request.
@@ -24,11 +26,11 @@ func getAccounts(env *env.Env) http.Handler {
 		*/
 		logger := log.ForRequest(r)
 		logger.Info("Logging something..")
-		respond.Ok(w, "🙌")
+		return respond.Success(http.StatusOK, "🙌")
 	})
 }
 
-func createAccount(env *env.Env) http.Handler {
+func createAccount(env *env.Env) handler.Handler {
 
 	/*
 		Keep your request structs local to the handler.
@@ -39,11 +41,10 @@ func createAccount(env *env.Env) http.Handler {
 		Bar int16
 	}
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return handler.HandlerFunc(func(w http.ResponseWriter, r *http.Request) *respond.Response {
 		var body Request
 		if err := request.Decode(r, &body); err != nil {
-			respond.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+			return respond.GenericServerError(err)
 		}
 
 		/*
@@ -51,7 +52,7 @@ func createAccount(env *env.Env) http.Handler {
 			`respond.OK(w, yourStructHere)`
 			Or you can compose your response as shown:
 		*/
-		respond.Ok(w, map[string]interface{}{
+		return respond.Success(http.StatusOK, map[string]interface{}{
 			"requestBody": body,
 		})
 	})

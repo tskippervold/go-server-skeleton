@@ -1,12 +1,13 @@
 package auth
 
 import (
+	"errors"
 	"net/http"
-
-	"github.com/tskippervold/golang-base-server/internal/app/model"
 
 	"github.com/gorilla/mux"
 	env "github.com/tskippervold/golang-base-server/internal/app"
+	"github.com/tskippervold/golang-base-server/internal/app/model"
+	"github.com/tskippervold/golang-base-server/internal/utils/handler"
 	"github.com/tskippervold/golang-base-server/internal/utils/log"
 	"github.com/tskippervold/golang-base-server/internal/utils/request"
 	"github.com/tskippervold/golang-base-server/internal/utils/respond"
@@ -17,7 +18,7 @@ func authHandlers(r *mux.Router, env *env.Env) {
 	r.Handle("/login", login(env)).Methods("POST")
 }
 
-func signup(env *env.Env) http.Handler {
+func signup(env *env.Env) handler.Handler {
 
 	type Request struct {
 		Email    string `json:"email"`
@@ -25,22 +26,20 @@ func signup(env *env.Env) http.Handler {
 		Password string `json:"password"`
 	}
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return handler.HandlerFunc(func(w http.ResponseWriter, r *http.Request) *respond.Response {
 		var body Request
 		if err := request.Decode(r, &body); err != nil {
-			respond.Error(w, err.Error(), http.StatusBadRequest)
-			return
+			return respond.GenericServerError(err)
 		}
 
 		accountExists, err := model.AccountExists(env.DB, body.Email)
-		if err != nil {
-			respond.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
+		if err != nil || accountExists {
+			if accountExists {
+				err = errors.New("Account exists")
+				return respond.Error(err, http.StatusConflict, "Account with email already exists", "account_exists")
+			}
 
-		if accountExists {
-			respond.Error(w, "Account already exists", http.StatusConflict)
-			return
+			return respond.GenericServerError(err)
 		}
 
 		tx := env.DB.MustBegin()
@@ -49,29 +48,26 @@ func signup(env *env.Env) http.Handler {
 		uIID, err := account.Insert(tx)
 		if err != nil {
 			tx.Rollback()
-			respond.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+			return respond.GenericServerError(err)
 		}
 
 		hash, _ := hashPassword(body.Password)
 		iden := model.NewIdentityEmail(body.Email, uIID, hash)
 		if err := iden.Insert(tx); err != nil {
 			tx.Rollback()
-			respond.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+			return respond.GenericServerError(err)
 		}
 
 		if err := tx.Commit(); err != nil {
 			tx.Rollback()
-			respond.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+			return respond.GenericServerError(err)
 		}
 
-		respond.Created(w, nil)
+		return respond.Success(http.StatusCreated, nil)
 	})
 }
 
-func login(env *env.Env) http.Handler {
+func login(env *env.Env) handler.Handler {
 
 	type Tokens struct {
 		AccessToken  *string `json:"accessToken"`
@@ -87,44 +83,40 @@ func login(env *env.Env) http.Handler {
 		Password string `json:"password"`
 	}
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return handler.HandlerFunc(func(w http.ResponseWriter, r *http.Request) *respond.Response {
 		logger := log.ForRequest(r)
 
 		var body Request
 		if err := request.Decode(r, &body); err != nil {
-			respond.Error(w, err.Error(), http.StatusBadRequest)
-			return
+			return respond.GenericServerError(err)
 		}
 
 		account, err := model.GetAccount(env.DB, body.Email)
 		if err != nil {
 			logger.Error(err)
-			respond.Error(w, "Account does not exist", http.StatusNotFound)
-			return
+			return respond.Error(err, http.StatusNotFound, "Account not found", "no_account")
 		}
 
 		ident, err := model.GetIdentityEmail(env.DB, account.Email)
 		if err != nil {
 			logger.Error(err)
-			respond.Error(w, "Account does not exist", http.StatusNotFound)
-			return
+			return respond.Error(err, http.StatusNotFound, "Account not found", "no_account")
 		}
 
 		if err := compareHashAndPassword(ident.PWHash, body.Password); err != nil {
-			logger.Error(err.Error())
-			respond.Error(w, err.Error(), http.StatusBadRequest)
-			return
+			logger.Error(err)
+			return respond.Error(err, http.StatusUnauthorized, "Wrong credentials", "invalid_credentials")
 		}
 
 		claims := defaultClaims()
 		jwt, err := signedJWTWithClaims(claims)
 		if err != nil {
-			logger.Error(err.Error())
-			respond.InternalError(w)
-			return
+			logger.Error(err)
+			return respond.GenericServerError(err)
+
 		}
 
-		respond.Ok(w, Response{
+		return respond.Success(http.StatusOK, Response{
 			Tokens: Tokens{
 				AccessToken: &jwt,
 			},

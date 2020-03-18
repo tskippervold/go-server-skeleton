@@ -35,6 +35,8 @@ const (
 )
 
 func Setup(r *mux.Router, env *env.Env) {
+	configureOAuthWithGoogle()
+	configureOAuthWithMicrosoft()
 	authHandlers(r, env)
 }
 
@@ -106,13 +108,14 @@ func publicKey() (*rsa.PublicKey, error) {
 	return key, nil
 }
 
-func defaultClaims() jwt.Claims {
-	expiresAt := time.Now().Add(time.Second * 120).Unix()
+func defaultClaims(subject string) jwt.Claims {
+	expiresAt := time.Now().Add(time.Minute * 10).Unix()
 
 	return jwt.StandardClaims{
 		ExpiresAt: expiresAt,
 		IssuedAt:  time.Now().Unix(),
 		Issuer:    "me",
+		Subject:   subject,
 	}
 }
 

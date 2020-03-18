@@ -1,8 +1,13 @@
 package auth
 
 import (
+	"database/sql"
+	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
+
+	"github.com/tskippervold/golang-base-server/internal/utils/slice"
 
 	"github.com/gorilla/mux"
 	env "github.com/tskippervold/golang-base-server/internal/app"
@@ -16,19 +21,23 @@ import (
 func authHandlers(r *mux.Router, env *env.Env) {
 	r.Handle("/signup", signup(env)).Methods("POST")
 	r.Handle("/login", login(env)).Methods("POST")
+
+	r.Handle("/oauth/{provider}", oauth(env)).Queries("account_type", "{accountType}").Methods("GET")
+	r.Handle("/oauth/{provider}/callback", oauthCallback(env)).Methods("GET")
 }
 
 func signup(env *env.Env) handler.Handler {
 
 	type Request struct {
-		Email    string `json:"email"`
-		Fullname string `json:"fullname"`
-		Password string `json:"password"`
+		Email    string            `json:"email"`
+		Fullname string            `json:"fullname"`
+		Password string            `json:"password"`
+		Type     model.AccountType `json:"type"`
 	}
 
 	return handler.HandlerFunc(func(w http.ResponseWriter, r *http.Request) *respond.Response {
 		var body Request
-		if err := request.Decode(r, &body); err != nil {
+		if err := request.Decode(r.Body, &body); err != nil {
 			return respond.GenericServerError(err)
 		}
 
@@ -44,16 +53,22 @@ func signup(env *env.Env) handler.Handler {
 
 		tx := env.DB.MustBegin()
 
-		account := model.NewAccount(body.Email)
-		uIID, err := account.Insert(tx)
+		account := model.NewAccount(body.Email, body.Type)
+		if err := account.Validate(); err != nil {
+			return respond.Error(err, http.StatusBadRequest, "Invalid request", "invalid_request")
+		}
+
+		accountIID, err := account.Insert(tx)
 		if err != nil {
 			tx.Rollback()
 			return respond.GenericServerError(err)
 		}
 
 		hash, _ := hashPassword(body.Password)
-		iden := model.NewIdentityEmail(body.Email, uIID, hash)
-		if err := iden.Insert(tx); err != nil {
+		ident := model.NewIdentity(model.IdentityTypeEmail, body.Email, accountIID)
+		ident.PWHash = hash
+
+		if err := ident.Insert(tx); err != nil {
 			tx.Rollback()
 			return respond.GenericServerError(err)
 		}
@@ -69,15 +84,6 @@ func signup(env *env.Env) handler.Handler {
 
 func login(env *env.Env) handler.Handler {
 
-	type Tokens struct {
-		AccessToken  *string `json:"accessToken"`
-		RefreshToken *string `json:"refreshToken"`
-	}
-
-	type Response struct {
-		Tokens Tokens `json:"tokens"`
-	}
-
 	type Request struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
@@ -87,7 +93,7 @@ func login(env *env.Env) handler.Handler {
 		logger := log.ForRequest(r)
 
 		var body Request
-		if err := request.Decode(r, &body); err != nil {
+		if err := request.Decode(r.Body, &body); err != nil {
 			return respond.GenericServerError(err)
 		}
 
@@ -97,7 +103,7 @@ func login(env *env.Env) handler.Handler {
 			return respond.Error(err, http.StatusNotFound, "Account not found", "no_account")
 		}
 
-		ident, err := model.GetIdentityEmail(env.DB, account.Email)
+		ident, err := model.GetIdentity(env.DB, model.IdentityTypeEmail, account.Email)
 		if err != nil {
 			logger.Error(err)
 			return respond.Error(err, http.StatusNotFound, "Account not found", "no_account")
@@ -108,18 +114,107 @@ func login(env *env.Env) handler.Handler {
 			return respond.Error(err, http.StatusUnauthorized, "Wrong credentials", "invalid_credentials")
 		}
 
-		claims := defaultClaims()
-		jwt, err := signedJWTWithClaims(claims)
+		return loginResponse(strconv.Itoa(account.IID))
+	})
+}
+
+func oauth(env *env.Env) handler.Handler {
+	return handler.HandlerFunc(func(w http.ResponseWriter, r *http.Request) *respond.Response {
+		accountType := mux.Vars(r)["accountType"]
+		passthrough := struct {
+			AccountType string `json:"account_type"`
+		}{
+			AccountType: accountType,
+		}
+
+		provider := OAuthProvider(mux.Vars(r)["provider"])
+		if err := OAuthAuthenticate(provider, w, r, passthrough); err != nil {
+			return respond.Error(err, http.StatusNotFound, "Not found", "not_found")
+		}
+
+		return nil
+	})
+}
+
+func oauthCallback(env *env.Env) handler.Handler {
+	return handler.HandlerFunc(func(w http.ResponseWriter, r *http.Request) *respond.Response {
+		logger := log.ForRequest(r)
+
+		provider := OAuthProvider(mux.Vars(r)["provider"])
+		oauth, err := OAuthCallback(provider, r)
 		if err != nil {
 			logger.Error(err)
 			return respond.GenericServerError(err)
-
 		}
 
-		return respond.Success(http.StatusOK, Response{
-			Tokens: Tokens{
-				AccessToken: &jwt,
-			},
-		})
+		// Get the passthrough value, which in this case is `account_type`.
+		var accountType string
+		if passthroughJSON := oauth.JSONPassthrough; passthroughJSON != "" {
+			var v map[string]string
+			if err := json.Unmarshal([]byte(passthroughJSON), &v); err != nil {
+				return respond.GenericServerError(err)
+			}
+
+			accountType = v["account_type"]
+		}
+
+		account, err := model.GetAccount(env.DB, oauth.Email)
+		if err != nil {
+			if err != sql.ErrNoRows {
+				logger.Error(err)
+				return respond.GenericServerError(err)
+			}
+
+			// Create account with Google oauth identity
+
+			account = model.NewAccount(oauth.Email, model.AccountType(accountType))
+			if err := account.Validate(); err != nil {
+				return respond.Error(err, http.StatusBadRequest, "Invalid request", "invalid_request")
+			}
+
+			tx := env.DB.MustBegin()
+
+			accountIID, err := account.Insert(tx)
+			if err != nil {
+				tx.Rollback()
+				return respond.GenericServerError(err)
+			}
+
+			ident := model.NewIdentity(model.IdentityType(provider), oauth.Email, accountIID)
+			ident.UID = oauth.ID
+
+			if err := ident.Insert(tx); err != nil {
+				tx.Rollback()
+				return respond.GenericServerError(err)
+			}
+
+			if err := tx.Commit(); err != nil {
+				tx.Rollback()
+				return respond.GenericServerError(err)
+			}
+		} else {
+			// Update account with Google oauth identity and account type
+
+			_, err := model.GetIdentity(env.DB, model.IdentityType(provider), oauth.ID)
+			if err != nil {
+				logger.Error(err)
+				return respond.Error(err, http.StatusNotFound, "Account not found", "no_account")
+			}
+
+			if slice.ContainsString(account.Type, accountType) == false {
+				account.Type = append(account.Type, accountType)
+			}
+
+			if err := account.Validate(); err != nil {
+				return respond.Error(err, http.StatusBadRequest, "Invalid request", "invalid_request")
+			}
+
+			if err := account.Update(env.DB); err != nil {
+				logger.Error(err)
+				return respond.GenericServerError(err)
+			}
+		}
+
+		return loginResponse(strconv.Itoa(account.IID))
 	})
 }

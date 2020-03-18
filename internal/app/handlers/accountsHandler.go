@@ -1,7 +1,10 @@
 package handlers
 
 import (
+	"database/sql"
 	"net/http"
+
+	"github.com/tskippervold/golang-base-server/internal/app/model"
 
 	"github.com/tskippervold/golang-base-server/internal/utils/request"
 	"github.com/tskippervold/golang-base-server/internal/utils/respond"
@@ -13,11 +16,11 @@ import (
 )
 
 func AccountsHandlers(r *mux.Router, env *env.Env) {
-	r.Handle("/", getAccounts(env)).Methods("GET")
-	r.Handle("/", createAccount(env)).Methods("POST")
+	r.Handle("/me", getMyAccount(env)).Methods("GET")
+	r.Handle("/update", updateAccount(env)).Methods("PUT")
 }
 
-func getAccounts(env *env.Env) handler.Handler {
+func getMyAccount(env *env.Env) handler.Handler {
 	return handler.HandlerFunc(func(w http.ResponseWriter, r *http.Request) *respond.Response {
 		/*
 			Get the logger for this request.
@@ -30,30 +33,48 @@ func getAccounts(env *env.Env) handler.Handler {
 	})
 }
 
-func createAccount(env *env.Env) handler.Handler {
+func updateAccount(env *env.Env) handler.Handler {
 
-	/*
-		Keep your request structs local to the handler.
-		This way you dont need excessive files just containing requests.
-	*/
+	type Update struct {
+		Summary         string   `json:"summary"`
+		AreaOfExpertise []string `json:"area_of_expertise"`
+		Certifications  []string `json:"certifications"`
+	}
+
 	type Request struct {
-		Foo string
-		Bar int16
+		AccountEmail string `json:"accountEmail"`
+		Update       Update `json:"update"`
 	}
 
 	return handler.HandlerFunc(func(w http.ResponseWriter, r *http.Request) *respond.Response {
 		var body Request
-		if err := request.Decode(r, &body); err != nil {
+		if err := request.Decode(r.Body, &body); err != nil {
 			return respond.GenericServerError(err)
 		}
 
-		/*
-			You can either return a `struct` directly to JSON using:
-			`respond.OK(w, yourStructHere)`
-			Or you can compose your response as shown:
-		*/
-		return respond.Success(http.StatusOK, map[string]interface{}{
-			"requestBody": body,
+		account, err := model.GetAccount(env.DB, body.AccountEmail)
+		if err != nil {
+			return respond.Error(err, http.StatusNotFound, "Account not found", "no_account")
+		}
+
+		if summary := body.Update.Summary; summary != "" {
+			account.Summary = sql.NullString{String: summary, Valid: true}
+		}
+
+		if aoe := body.Update.AreaOfExpertise; aoe != nil {
+			account.AreaOfExpertise = aoe
+		}
+
+		if certs := body.Update.Certifications; certs != nil {
+			account.Certifications = certs
+		}
+
+		if err := account.Update(env.DB); err != nil {
+			return respond.GenericServerError(err)
+		}
+
+		return respond.Success(200, map[string]string{
+			"status": "ok",
 		})
 	})
 }

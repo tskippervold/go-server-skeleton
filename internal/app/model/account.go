@@ -1,17 +1,34 @@
 package model
 
 import (
+	"database/sql"
+
+	"github.com/lib/pq"
+
+	"github.com/go-playground/validator"
 	"github.com/jmoiron/sqlx"
 )
 
 type Account struct {
 	BaseModel
-	Email string `db:"email"`
+	Email           string         `db:"email" validate:"required,email"`
+	Type            pq.StringArray `db:"type" validate:"dive,eq=regular|eq=consultant"`
+	Summary         sql.NullString `db:"summary"`
+	AreaOfExpertise pq.StringArray `db:"area_of_expertise"`
+	Certifications  pq.StringArray `db:"certifications"`
 }
 
-func NewAccount(email string) Account {
+type AccountType string
+
+const (
+	AccountTypeRegular    AccountType = "regular"
+	AccountTypeConsultant AccountType = "consultant"
+)
+
+func NewAccount(email string, t AccountType) Account {
 	return Account{
 		Email: email,
+		Type:  []string{string(t)},
 	}
 }
 
@@ -27,9 +44,14 @@ func GetAccount(db *sqlx.DB, email string) (Account, error) {
 	return a, err
 }
 
+func (a *Account) Validate() error {
+	v := validator.New()
+	return v.Struct(a)
+}
+
 func (a *Account) Insert(tx *sqlx.Tx) (int, error) {
-	q := `INSERT INTO account(email)
-		  VALUES(:email)
+	q := `INSERT INTO account(email, type)
+		  VALUES(:email, :type)
 		  RETURNING iid`
 
 	stmt, err := tx.PrepareNamed(q)
@@ -43,4 +65,24 @@ func (a *Account) Insert(tx *sqlx.Tx) (int, error) {
 	}
 
 	return iid, err
+}
+
+func (a *Account) Update(db *sqlx.DB) error {
+	q := `UPDATE account
+		  SET
+		  	summary=:summary,
+			area_of_expertise=:areaOfExpertise,
+			certifications=:certifications,
+			type=:type
+		  WHERE iid=:iid`
+
+	_, err := db.NamedExec(q, map[string]interface{}{
+		"iid":             a.IID,
+		"summary":         a.Summary,
+		"areaOfExpertise": a.AreaOfExpertise,
+		"certifications":  a.Certifications,
+		"type":            a.Type,
+	})
+
+	return err
 }

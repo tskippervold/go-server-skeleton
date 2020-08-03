@@ -48,3 +48,11 @@ func (i *Identity) Insert(tx *sqlx.Tx) error {
 	_, err := tx.NamedExec(q, i)
 	return err
 }
+
+func (i *Identity) InsertIfNew(db *sqlx.DB) error {
+	q := `INSERT INTO identity(provider, uid, pw_hash, account_iid, confirmed_at)
+		  VALUES(:provider, :uid, :pw_hash, :account_iid, :confirmed_at)
+		  ON CONFLICT (provider, account_iid) DO NOTHING`
+	_, err := db.NamedExec(q, i)
+	return err
+}

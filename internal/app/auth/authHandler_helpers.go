@@ -15,8 +15,8 @@ type LoginResponse struct {
 	Tokens Tokens `json:"tokens"`
 }
 
-func loginResponse(accountID string) *respond.Response {
-	claims := defaultClaims(accountID)
+func loginResponse(email string) *respond.Response {
+	claims := defaultClaims(email)
 
 	jwt, err := signedJWTWithClaims(claims)
 	if err != nil {

@@ -60,15 +60,15 @@ type OAuthResult struct {
 
 func configureOAuthWithGoogle() {
 	cred := credentials{
-		id:     "",
-		secret: "",
+		id:     "208084384794-h2dr3ri4g8ouhun61gd36koh7i76eig4.apps.googleusercontent.com",
+		secret: "bbCTXSdrg35rAINUMgMlBtbg",
 	}
 
 	googleOAuthConfig = &oauth2.Config{
 		ClientID:     cred.id,
 		ClientSecret: cred.secret,
 		Endpoint:     google.Endpoint,
-		RedirectURL:  "http://localhost:8080/auth/oauth/google/callback",
+		RedirectURL:  "http://localhost:3000/auth/oauth/google/callback",
 		Scopes: []string{
 			"https://www.googleapis.com/auth/userinfo.email",
 		},
@@ -77,17 +77,17 @@ func configureOAuthWithGoogle() {
 
 func configureOAuthWithMicrosoft() {
 	cred := credentials{
-		id:     "",
-		secret: "",
+		id:     "44a0f725-cee8-412c-b6c9-6db6d8602574",
+		secret: "3c=gmK?i531o-XMORSmM/rUb4[@l]0Uz",
 	}
 
-	tenant := ""
+	tenant := "342a0539-37c3-4c36-8188-d8bd916d7de5"
 
 	microsoftOAuthConfig = &oauth2.Config{
 		ClientID:     cred.id,
 		ClientSecret: cred.secret,
 		Endpoint:     microsoft.AzureADEndpoint(tenant),
-		RedirectURL:  "http://localhost:8080/auth/oauth/microsoft/callback",
+		RedirectURL:  "http://localhost:3000/auth/oauth/microsoft/callback",
 		Scopes: []string{
 			"openid",
 			"offline_access",

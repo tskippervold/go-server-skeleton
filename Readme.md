@@ -9,8 +9,8 @@ To run the server: `go run cmd/main.go`
 Create `.yml` files on the `/configs` directory.
 You can duplicate the existing `local.yml`.
 
-Run the server with `-config={filename}` argument.
-During development, you can do `go run cmd/main.go -config=local.yml`.
+Run the server with `-config={path_to_config.yml}` argument.
+During development, you can do `go run cmd/main.go -config=./config/local.yml`.
 
 ## Database migrations
 `migrate create -ext sql -dir internal/db/migrations -seq create_<tablename>_table`

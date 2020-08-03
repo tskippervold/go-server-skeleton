@@ -11,11 +11,12 @@ import (
 
 type Account struct {
 	BaseModel
-	Email           string         `db:"email" validate:"required,email"`
+	Email           string         `db:"email" validate:"required,email" json:"email"`
 	Type            pq.StringArray `db:"type" validate:"dive,eq=regular|eq=consultant"`
 	Summary         sql.NullString `db:"summary"`
 	AreaOfExpertise pq.StringArray `db:"area_of_expertise"`
 	Certifications  pq.StringArray `db:"certifications"`
+	CompanyIID      sql.NullInt64  `db:"company_iid"`
 }
 
 type AccountType string

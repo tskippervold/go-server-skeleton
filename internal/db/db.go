@@ -56,7 +56,7 @@ func Migrate() error {
 		return err
 	}
 
-	m, err := migrate.NewWithDatabaseInstance("file://../internal/db/migrations", "postgres", driver)
+	m, err := migrate.NewWithDatabaseInstance("./internal/db/migrations", "postgres", driver)
 	if err != nil {
 		return err
 	}

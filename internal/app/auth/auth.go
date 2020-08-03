@@ -9,6 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jmoiron/sqlx"
+	"github.com/tskippervold/golang-base-server/internal/app/model"
+
 	"github.com/tskippervold/golang-base-server/internal/utils/respond"
 
 	"golang.org/x/crypto/bcrypt"
@@ -48,6 +51,22 @@ func ForRequest(r *http.Request) *jwt.Token {
 	return nil
 }
 
+func AuthenticatedAccount(r *http.Request, db *sqlx.DB) (*model.Account, error) {
+	t, ok := r.Context().Value(requestAuth).(*jwt.Token)
+	if ok == false {
+		return nil, ErrInvalidCredentials
+	}
+
+	c, ok := t.Claims.(jwt.MapClaims)
+	if ok == false {
+		return nil, ErrInvalidCredentials
+	}
+
+	subject := c["sub"].(string)
+	account, err := model.GetAccount(db, subject)
+	return &account, err
+}
+
 func JWTMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log := log.ForRequest(r)
@@ -58,7 +77,6 @@ func JWTMiddleware(next http.Handler) http.Handler {
 
 		if bearerToken == "" {
 			err := errors.New("Bearer token is malformed or missing")
-			log.Info(err)
 
 			res := respond.Error(err, http.StatusUnauthorized, "Authorization required", "missing_auth")
 			res.Write(w)
@@ -109,7 +127,7 @@ func publicKey() (*rsa.PublicKey, error) {
 }
 
 func defaultClaims(subject string) jwt.Claims {
-	expiresAt := time.Now().Add(time.Minute * 10).Unix()
+	expiresAt := time.Now().Add(time.Minute * 30).Unix()
 
 	return jwt.StandardClaims{
 		ExpiresAt: expiresAt,

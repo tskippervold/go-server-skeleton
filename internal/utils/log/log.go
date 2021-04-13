@@ -27,6 +27,8 @@ type Log struct {
 	fields *logrus.Fields
 }
 
+var formatter logrus.Formatter
+
 // Creates a new Log instance.
 func NewLogger() *Log {
 	_, file, no, _ := runtime.Caller(1)
@@ -38,9 +40,15 @@ func NewLogger() *Log {
 		},
 	}
 
-	logger.logger.Formatter = &logrus.TextFormatter{
-		DisableTimestamp: false,
+	logger.logger.SetLevel(logrus.DebugLevel)
+
+	if formatter == nil {
+		formatter = &logrus.TextFormatter{
+			DisableTimestamp: false,
+		}
 	}
+
+	logger.logger.Formatter = formatter
 
 	return &logger
 }

@@ -12,9 +12,12 @@ require (
 	github.com/gorilla/mux v1.7.4
 	github.com/jackc/pgx v3.6.2+incompatible
 	github.com/jmoiron/sqlx v1.2.0
+	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/leodido/go-urn v1.2.0 // indirect
 	github.com/lib/pq v1.3.0
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
+	github.com/okta/okta-jwt-verifier-golang v1.0.0
+	github.com/okta/okta-sdk-golang/v2 v2.0.0
 	github.com/rs/cors v1.7.0
 	github.com/satori/go.uuid v1.2.0
 	github.com/shopspring/decimal v0.0.0-20200227202807-02e2044944cc // indirect

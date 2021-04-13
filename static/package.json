@@ -1,0 +1,21 @@
+{
+  "name": "zo-checkouts",
+  "version": "1.0.0",
+  "description": "Checkouts for 01Pay",
+  "author": "Theodor Skippervold",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "dev": "nuxt --port 3001",
+    "build": "nuxt build",
+    "generate": "nuxt generate",
+    "start": "nuxt start"
+  },
+  "dependencies": {
+    "nuxt": "^2.14.3"
+  },
+  "devDependencies": {
+    "@nuxtjs/component-cache": "^1.1.6",
+    "@nuxtjs/tailwindcss": "^3.0.1"
+  }
+}

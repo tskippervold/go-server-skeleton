@@ -1,0 +1,23 @@
+[
+  {
+    "name": "checkout-frame",
+    "path": "/checkout-frame",
+    "component": "/Users/theodorskippervold/.go/src/github.com/tskippervold/golang-base-server/static/pages/checkout-frame/index.vue",
+    "chunkName": "pages/checkout-frame/index",
+    "_name": "_67f60864"
+  },
+  {
+    "name": "checkout-inline",
+    "path": "/checkout-inline",
+    "component": "/Users/theodorskippervold/.go/src/github.com/tskippervold/golang-base-server/static/pages/checkout-inline/index.vue",
+    "chunkName": "pages/checkout-inline/index",
+    "_name": "_194c3fae"
+  },
+  {
+    "name": "index",
+    "path": "/",
+    "component": "/Users/theodorskippervold/.go/src/github.com/tskippervold/golang-base-server/static/pages/index.vue",
+    "chunkName": "pages/index",
+    "_name": "_3555dbfd"
+  }
+]

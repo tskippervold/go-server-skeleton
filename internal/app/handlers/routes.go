@@ -9,4 +9,6 @@ import (
 // You should pass the Env `env` to all the registered handlers.
 func Setup(r *mux.Router, env *env.Env) {
 	AccountsHandlers(r.PathPrefix("/accounts").Subrouter(), env)
+	CompanyHandler(r.PathPrefix("/company").Subrouter(), env)
+	CheckoutHandlers(r.PathPrefix("/checkout").Subrouter(), env)
 }

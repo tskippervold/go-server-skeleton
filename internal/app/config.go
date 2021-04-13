@@ -4,6 +4,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/kelseyhightower/envconfig"
 	"gopkg.in/yaml.v2"
 )
 
@@ -15,8 +16,8 @@ import (
 
 type Config struct {
 	Server struct {
-		Port              string        `yaml:"port"`
-		ConnectionTimeout time.Duration `yaml:"connectionTimeout"`
+		Port              string        `yaml:"port" envconfig:"PORT"`
+		ConnectionTimeout time.Duration `yaml:"connectionTimeout" envconfig:"CONN_TIMEOUT"`
 	} `yaml:"server"`
 
 	Database struct {
@@ -30,6 +31,12 @@ type Config struct {
 
 // LoadConfig reads specified yaml file and returns a `Config` struct.
 func LoadConfig(path string) (Config, error) {
+	if len(path) <= 0 {
+		var cfg Config
+		err := envconfig.Process("", &cfg)
+		return cfg, err
+	}
+
 	f, err := os.Open(path)
 	if err != nil {
 		return Config{}, err

@@ -1,0 +1,24 @@
+{
+    "people": [
+        {
+            "id": "2971452",
+            "name": "MARIE RØGLER",
+            "sharePercentage": 33.33,
+            "entityType": "Person"
+        },
+        {
+            "id": "2954261",
+            "name": "Christian Aandalen",
+            "sharePercentage": 33.33,
+            "entityType": "Person"
+        },
+        {
+            "id": "1911830",
+            "name": "Herman Sjøberg",
+            "sharePercentage": 33.33,
+            "entityType": "Person"
+        }
+    ],
+    "totalSharePercentage": 99.99,
+    "maxSingleSharePercentage": 33.33
+}

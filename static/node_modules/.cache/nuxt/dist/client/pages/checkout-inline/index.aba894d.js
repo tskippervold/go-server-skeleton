@@ -1,0 +1,1 @@
+(window.webpackJsonp=window.webpackJsonp||[]).push([[2],{158:function(n,e,t){"use strict";t.r(e);var c=t(20),component=Object(c.a)({},(function(){var n=this.$createElement;return(this._self._c||n)("h1",[this._v("Inline checkout")])}),[],!1,null,null,null);e.default=component.exports}}]);

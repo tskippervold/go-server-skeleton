@@ -4,13 +4,15 @@ import (
 	"context"
 	"crypto/rsa"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/tskippervold/golang-base-server/internal/app/model"
+	jwtverifier "github.com/okta/okta-jwt-verifier-golang"
+	"github.com/okta/okta-sdk-golang/v2/okta"
 
 	"github.com/tskippervold/golang-base-server/internal/utils/respond"
 
@@ -24,6 +26,7 @@ import (
 	"github.com/tskippervold/golang-base-server/internal/utils/log"
 )
 
+type accessToken *jwtverifier.Jwt
 type contextKey string
 type Error string
 
@@ -37,34 +40,52 @@ const (
 	ErrInvalidCredentials = Error("Invalid credentials")
 )
 
+var (
+	oktaClient *okta.Client
+)
+
 func Setup(r *mux.Router, env *env.Env) {
+	logger := log.NewLogger()
+
 	configureOAuthWithGoogle()
 	configureOAuthWithMicrosoft()
 	authHandlers(r, env)
+
+	logger.Info("Configuring Okta client.")
+	_, client, err := okta.NewClient(context.TODO())
+	if err != nil {
+		logger.Error(err)
+		panic(err)
+	}
+
+	oktaClient = client
 }
 
-func ForRequest(r *http.Request) *jwt.Token {
-	if t, ok := r.Context().Value(requestAuth).(*jwt.Token); ok {
+func ForRequest(r *http.Request) accessToken {
+	if t, ok := r.Context().Value(requestAuth).(accessToken); ok {
 		return t
 	}
 
 	return nil
 }
 
-func AuthenticatedAccount(r *http.Request, db *sqlx.DB) (*model.Account, error) {
-	t, ok := r.Context().Value(requestAuth).(*jwt.Token)
+func AuthenticatedAccount(r *http.Request, db *sqlx.DB) (*okta.User, error) {
+	log := log.ForRequest(r)
+
+	t, ok := r.Context().Value(requestAuth).(accessToken)
 	if ok == false {
 		return nil, ErrInvalidCredentials
 	}
 
-	c, ok := t.Claims.(jwt.MapClaims)
-	if ok == false {
-		return nil, ErrInvalidCredentials
+	uid := fmt.Sprintf("%v", t.Claims["uid"])
+	log.Debug("Getting Okta user", uid)
+
+	user, _, err := oktaClient.User.GetUser(context.TODO(), uid)
+	if err != nil {
+		return nil, err
 	}
 
-	subject := c["sub"].(string)
-	account, err := model.GetAccount(db, subject)
-	return &account, err
+	return user, nil
 }
 
 func JWTMiddleware(next http.Handler) http.Handler {
@@ -84,6 +105,7 @@ func JWTMiddleware(next http.Handler) http.Handler {
 		}
 
 		token, err := parseAndVerifyJWT(bearerToken)
+
 		if err != nil {
 			log.Info(err)
 			res := respond.Error(err, http.StatusUnauthorized, "Invalid credentials", "invalid_credentials")
@@ -153,18 +175,18 @@ func signedJWTWithClaims(c jwt.Claims) (string, error) {
 	return signedToken, nil
 }
 
-func parseAndVerifyJWT(str string) (*jwt.Token, error) {
-	ecdsaKey, err := publicKey()
-	if err != nil {
-		return nil, err
+func parseAndVerifyJWT(tokenString string) (accessToken, error) {
+	claims := map[string]string{}
+	claims["aud"] = "api://default"
+	claims["cid"] = "0oaocuc380xeJPqoh4x6" // ClientID
+
+	setup := jwtverifier.JwtVerifier{
+		Issuer:           "https://auth.01pay.no/oauth2/default",
+		ClaimsToValidate: claims,
 	}
 
-	token, err := jwt.Parse(str, func(token *jwt.Token) (interface{}, error) {
-		return ecdsaKey, nil
-	})
-
-	// Verify token...
-
+	verifier := setup.New()
+	token, err := verifier.VerifyAccessToken(tokenString)
 	if err != nil {
 		return nil, err
 	}

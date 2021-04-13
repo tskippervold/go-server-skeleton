@@ -1,0 +1,51 @@
+{
+    "name": "PERSEQUOR AS",
+    "organisationNumber": "925007978",
+    "postalAddress": {
+      "addressLine": "Hønskogen 26",
+      "boxAddressLine": null,
+      "postPlace": "Asker",
+      "zipCode": "1384"
+    },
+    "companyType": "AS",
+    "registeredForVat": false,
+    "registrationDate": "29.04.2020",
+    "naceCategories": [
+      "47.990 Detaljhandel utenom utsalgssted ellers"
+    ],
+    "shareholders": [
+      {
+        "companyId": "923094539",
+        "details": {
+          "href": "https://api.proff.no/companies/register/NO/923094539",
+          "rel": "related"
+        },
+        "firstName": null,
+        "lastName": null,
+        "name": "CHAA HOLDING AS",
+        "numberOfShares": 1,
+        "share": "33.33"
+      },
+      {
+        "companyId": null,
+        "details": null,
+        "firstName": null,
+        "lastName": null,
+        "name": "MARIE RØGLER",
+        "numberOfShares": 1,
+        "share": "33.33"
+      },
+      {
+        "companyId": "992827610",
+        "details": {
+          "href": "https://api.proff.no/companies/register/NO/992827610",
+          "rel": "related"
+        },
+        "firstName": null,
+        "lastName": null,
+        "name": "SJØBERG INVEST AS",
+        "numberOfShares": 1,
+        "share": "33.33"
+      }
+    ]
+  }

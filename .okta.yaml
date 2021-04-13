@@ -1,0 +1,10 @@
+okta:
+    client:
+      connectionTimeout: 30 # seconds
+      orgUrl: "https://auth.01pay.no"
+      proxy:
+        port: null
+        host: null
+        username: null
+        password: null
+      token: 00WuzCQ9idSJBpPfcIeTHkRQsg_H0r_ZuvkeyL6LkU

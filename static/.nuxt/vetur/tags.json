@@ -1,0 +1,20 @@
+{
+  "CustomerForm": {
+    "description": "Auto imported from components/CustomerForm.vue"
+  },
+  "LazyCustomerForm": {
+    "description": "Auto imported from components/CustomerForm.vue"
+  },
+  "PaymentSelector": {
+    "description": "Auto imported from components/PaymentSelector.vue"
+  },
+  "LazyPaymentSelector": {
+    "description": "Auto imported from components/PaymentSelector.vue"
+  },
+  "SelectedCustomer": {
+    "description": "Auto imported from components/SelectedCustomer.vue"
+  },
+  "LazySelectedCustomer": {
+    "description": "Auto imported from components/SelectedCustomer.vue"
+  }
+}
